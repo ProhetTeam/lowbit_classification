@@ -1,6 +1,6 @@
 import argparse
 import copy
-import os
+import os, sys
 import os.path as osp
 import time
 
@@ -9,11 +9,16 @@ import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist
 
-from mmdet import __version__
-from mmdet.apis import set_random_seed, train_detector
-from mmdet.datasets import build_dataset
-from mmdet.models import build_detector
-from mmdet.utils import collect_env, get_root_logger
+#import git
+#repo = git.Repo('.', search_parent_directories=True)
+#sys.path.insert(0, str(repo.working_tree_dir))
+
+from lbitcls import __version__
+from lbitcls.datasets import build_dataset
+from lbitcls.utils import collect_env, get_root_logger
+from lbitcls.models import build_classifier
+from lbitcls.apis import set_random_seed, train_classifier
+
 
 
 def parse_args():
@@ -122,24 +127,24 @@ def main():
     cfg.seed = args.seed
     meta['seed'] = args.seed
 
-    model = build_detector(
-        cfg.model, train_cfg=cfg.train_cfg, test_cfg=cfg.test_cfg)
-
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
         val_dataset.pipeline = cfg.data.train.pipeline
         datasets.append(build_dataset(val_dataset))
     if cfg.checkpoint_config is not None:
-        # save mmdet version, config file content and class names in
+        # save lbitcls version, config file content and class names in
         # checkpoints as meta data
         cfg.checkpoint_config.meta = dict(
-            mmdet_version=__version__,
+            lbitcls_version=__version__,
             config=cfg.pretty_text,
             CLASSES=datasets[0].CLASSES)
+
+    model = build_classifier(cfg.model)
+
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
-    train_detector(
+    train_classifier(
         model,
         datasets,
         cfg,
