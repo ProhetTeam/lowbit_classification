@@ -104,7 +104,8 @@ def train_classifier(model,
             samples_per_gpu=cfg.data.samples_per_gpu,
             workers_per_gpu=cfg.data.workers_per_gpu,
             dist=distributed,
-            shuffle=False)
+            shuffle=False,
+            round_up=True)
         eval_cfg = cfg.get('evaluation', {})
         eval_hook = DistEvalHook if distributed else EvalHook
         runner.register_hook(eval_hook(val_dataloader, **eval_cfg))
