@@ -3,11 +3,15 @@
 
 ## Introduction
 
-lowbit classification training is depveloped for effective quantization training.
+Welcome to low-bit training.
 
 ### Design pattern
 
-+ Backbone, Loss, Quantization .....(TODO)
+Please refer to [intro](./doc/constructure.md).
+
+### Installation
+
+Please refer to [install.md](doc/install.md).
 
 ### Backbone
 - [x] ResNet
