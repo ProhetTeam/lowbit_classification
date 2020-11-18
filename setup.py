@@ -180,5 +180,4 @@ if __name__ == "__main__":
         license='Apache License 2.0',
         setup_requires=parse_requirements('requirements/build.txt'),
         install_requires=parse_requirements('requirements/runtime.txt'),
-        cmdclass={'build_ext': BuildExtension},
         zip_safe=False)

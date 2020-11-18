@@ -64,10 +64,10 @@ def train_classifier(model,
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False,
             find_unused_parameters=find_unused_parameters)
-    else:
+    elif not cfg.cpu_only:
         model = MMDataParallel(
             model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
-        #pass
+            
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
     runner = EpochBasedRunner(

@@ -18,7 +18,7 @@ from lbitcls.datasets import build_dataset
 from lbitcls.utils import collect_env, get_root_logger
 from lbitcls.models import build_classifier
 from lbitcls.apis import set_random_seed, train_classifier
-
+from lbitcls.mtransformer import build_mtransformer
 
 
 def parse_args():
@@ -50,6 +50,10 @@ def parse_args():
         help='whether to set deterministic options for CUDNN backend.')
     parser.add_argument(
         '--options', nargs='+', action=DictAction, help='arguments in dict')
+    parser.add_argument(
+        '--cpu-only', action='store_true', 
+        help="if gpu is not avaiable and open it"
+    )
     parser.add_argument(
         '--launcher',
         choices=['none', 'pytorch'],
@@ -104,6 +108,8 @@ def main():
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
     logger.info(f"os.enviro:\n {os.environ} \n")
+    if args.cpu_only is not None:
+        cfg.cpu_only = args.cpu_only
 
     # init the meta dict to record some important information such as
     # environment info and seed, which will be logged
@@ -142,6 +148,9 @@ def main():
             CLASSES=datasets[0].CLASSES)
 
     model = build_classifier(cfg.model)
+    if hasattr(cfg, "quant_transformer"):
+        model_transformer = build_mtransformer(cfg.quant_transformer)
+        model = model_transformer(model)
 
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
