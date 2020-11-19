@@ -108,7 +108,7 @@ def main():
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)
     logger.info(f"os.enviro:\n {os.environ} \n")
-    if args.cpu_only is not None:
+    if args.cpu_only is True:
         cfg.cpu_only = args.cpu_only
 
     # init the meta dict to record some important information such as
@@ -150,7 +150,7 @@ def main():
     model = build_classifier(cfg.model)
     if hasattr(cfg, "quant_transformer"):
         model_transformer = build_mtransformer(cfg.quant_transformer)
-        model = model_transformer(model)
+        model = model_transformer(model, logger= logger)
 
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES

@@ -56,6 +56,12 @@ class DSQLinear(nn.Linear):
 
         return x
 
+    def floor_pass(self, x):
+        #return torch.floor(x)
+        y = torch.floor(x) 
+        y_grad = x
+        return y.detach() - y_grad.detach() + y_grad
+
     def phi_function(self, x, mi, alpha, delta):
 
         # alpha should less than 2 or log will be None
@@ -93,7 +99,8 @@ class DSQLinear(nn.Linear):
             cur_max = torch.max(Qweight)
             cur_min = torch.min(Qweight)
             delta =  (cur_max - cur_min)/(self.bit_range)
-            interval = (Qweight - cur_min) //delta            
+            #interval = (Qweight - cur_min) //delta
+            interval = self.floor_pass((Qweight - cur_min) /delta)         
             mi = (interval + 0.5) * delta + cur_min
             Qweight = self.phi_function(Qweight, mi, self.alphaW, delta)
             Qweight = self.sgn(Qweight)
@@ -115,7 +122,8 @@ class DSQLinear(nn.Linear):
                 cur_max = torch.max(Qbias)
                 cur_min = torch.min(Qbias)
                 delta =  (cur_max - cur_min)/(self.bit_range)
-                interval = (Qbias - cur_min) //delta
+                #interval = (Qbias - cur_min) //delta
+                interval = self.floor_pass((Qbias - cur_min) /delta)
                 mi = (interval + 0.5) * delta + cur_min
                 Qbias = self.phi_function(Qbias, mi, self.alphaB, delta)
                 Qbias = self.sgn(Qbias)
@@ -136,7 +144,8 @@ class DSQLinear(nn.Linear):
                 cur_max = torch.max(Qactivation)
                 cur_min = torch.min(Qactivation)
                 delta =  (cur_max - cur_min)/(self.bit_range)
-                interval = (Qactivation - cur_min) //delta
+                #interval = (Qactivation - cur_min) //delta
+                interval = self.floor_pass((Qactivation - cur_min) /delta)
                 mi = (interval + 0.5) * delta + cur_min                
                 Qactivation = self.phi_function(Qactivation, mi, self.alphaA, delta)
                 Qactivation = self.sgn(Qactivation)
