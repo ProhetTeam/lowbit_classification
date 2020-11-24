@@ -1,3 +1,6 @@
 [submodule "thirdparty/configs"]
 	path = thirdparty/configs
 	url = git@git-core.megvii-inc.com:tanfeiyang/lowbit_classification_config.git
+[submodule "thirdparty/modelzoo"]
+	path = thirdparty/modelzoo
+	url = git@git-core.megvii-inc.com:tanfeiyang/modelzoo.git
