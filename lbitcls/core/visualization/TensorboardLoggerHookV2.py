@@ -72,6 +72,8 @@ class TensorboardLoggerHookV2(LoggerHook):
                 for name, param in runner.model.named_parameters():
                     if 'bn' not in name:
                         self.writer.add_histogram(name, param, self.get_epoch(runner))
+                        if hasattr(param, "grad"):
+                            self.writer.add_histogram(name+"_grad", param.grad, self.get_epoch(runner))
 
     @master_only
     def after_run(self, runner):
