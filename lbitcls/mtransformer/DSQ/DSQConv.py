@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ..builder import QUANLAYERS
+from lbitcls.utils import get_rank
 
-
+DEBUG = False
 class RoundWithGradient(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x):
@@ -18,13 +19,17 @@ class RoundWithGradient(torch.autograd.Function):
 class DSQConv(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True,
                 momentum = 0.1,                
-                num_bit = 8, QInput = True, bSetQ = True):
+                num_bit = 8, 
+                QInput = True, 
+                bSetQ = True,
+                alpha_thres = 0.5):
         super(DSQConv, self).__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias)
         self.num_bit = num_bit
         self.quan_input = QInput
         self.bit_range = 2**self.num_bit -1	 
         self.is_quan = bSetQ        
         self.momentum = momentum
+        self.alpha_thres = alpha_thres
         if self.is_quan:
             # using int32 max/min as init and backprogation to optimization
             # Weight
@@ -40,7 +45,6 @@ class DSQConv(nn.Conv2d):
                 self.register_buffer('running_uB', torch.tensor([self.uB.data]))# init with ub
                 self.register_buffer('running_lB', torch.tensor([self.lB.data]))# init with lb
                 self.alphaB = nn.Parameter(data = torch.tensor(0.2).float())
-                
 
             # Activation input		
             if self.quan_input:
@@ -52,25 +56,15 @@ class DSQConv(nn.Conv2d):
 
     def clipping(self, x, upper, lower):
         x = x.clamp(lower.item(), upper.item())
-        '''
-        # clip lower
-        x = x + F.relu(lower - x, inplace=True)
-        # clip upper
-        x = x - F.relu(x - upper, inplace=True)
-        '''
         return x
 
     def floor_pass(self, x):
-        #return torch.floor(x)
         y = torch.floor(x) 
         y_grad = x
         return y.detach() - y_grad.detach() + y_grad
         
     def phi_function(self, x, mi, alpha, delta):
-
-        # alpha should less than 2 or log will be None
-        # alpha = alpha.clamp(None, 2)
-        alpha = torch.where(alpha >= 2.0, torch.tensor([2.0], device = x.device), alpha)
+        alpha = alpha.clamp(1e-6, self.alpha_thres - 1e-6)
         s = 1/(1-alpha)
         k = (2/alpha - 1).log() * (1/delta)
         x = (((x - mi) *k ).tanh()) * s 
@@ -78,7 +72,6 @@ class DSQConv(nn.Conv2d):
 
     def sgn(self, x):
         x = RoundWithGradient.apply(x)
-
         return x
 
     def dequantize(self, x, lower_bound, delta, interval):
@@ -89,11 +82,7 @@ class DSQConv(nn.Conv2d):
         return x
 
     def forward(self, x):
-        #import ipdb
-        #ipdb.set_trace()
         if self.is_quan:
-            # Weight Part
-            # moving average
             if self.training:
                 cur_running_lw = self.running_lw.mul(1-self.momentum).add((self.momentum) * self.lW)
                 cur_running_uw = self.running_uw.mul(1-self.momentum).add((self.momentum) * self.uW)
