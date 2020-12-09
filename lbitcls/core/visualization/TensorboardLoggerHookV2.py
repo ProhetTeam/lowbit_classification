@@ -13,11 +13,13 @@ class TensorboardLoggerHookV2(LoggerHook):
                  ignore_last=True,
                  reset_flag=True,
                  by_epoch=True,
-                 weight_vis_interval = 1):
+                 weight_vis_interval = 1,
+                 by_iter=False):
         super(TensorboardLoggerHookV2, self).__init__(interval, ignore_last,
                                                     reset_flag, by_epoch)
         self.log_dir = log_dir
         self.weight_vis_interval = weight_vis_interval
+        self.by_iter = by_iter
 
     @master_only
     def before_run(self, runner):
@@ -71,11 +73,46 @@ class TensorboardLoggerHookV2(LoggerHook):
             if runner.mode == 'train' and self.every_n_epochs(runner, self.weight_vis_interval):
                 for name, param in runner.model.named_parameters():
                     if 'bn' not in name:
-                        self.writer.add_histogram(name, param, self.get_epoch(runner))
-                        if hasattr(param, "grad"):
-                            self.writer.add_histogram(name+"_grad", param.grad, self.get_epoch(runner))
+                        self.writer.add_histogram('model_by_epoch/' +  name, param, self.get_epoch(runner))
+                        if hasattr(param, "grad") and param.grad is not None:
+                            self.writer.add_histogram('model_by_epoch/' + name + "_grad", param.grad, self.get_epoch(runner))
 
     @master_only
     def after_run(self, runner):
         self.writer.close()
 
+    
+    @master_only
+    def after_train_iter(self, runner):
+
+        def get_global_iter(runner):
+            return runner.epoch * len(runner.data_loader) + runner.inner_iter
+        
+        def every_n_global_iter(runner, n):
+            return (get_global_iter(runner) + 1 ) % n == 0 if n > 0 else False
+
+        ### 1. draw training : val loss top1, top1 , and etc
+        if runner.log_buffer.ready:
+            tags = self.get_loggable_tags(runner, allow_text=True)
+            for tag, val in tags.items():
+                if isinstance(val, str):
+                    self.writer.add_text( tag, val, get_global_iter(runner) + 1)
+                else:
+                    self.writer.add_scalar(tag, val, get_global_iter(runner) + 1)
+            if self.reset_flag:
+                runner.log_buffer.clear_output()
+        
+        ### 2. Draw Model Paras: such as weights, bias, and etc parameters distribution.
+        if runner.mode == 'train' and \
+            self.by_iter and \
+            every_n_global_iter(runner, self.interval):
+                for name, param in runner.model.named_parameters():
+                    if 'bn' not in name:
+                        if not param.numel() == 1: # Tensor
+                            self.writer.add_histogram('model_by_iter/' + name, param, get_global_iter(runner) + 1)
+                            if hasattr(param, "grad") and param.grad is not None:
+                                self.writer.add_histogram('model_by_iter/' + name + "_grad", param.grad, get_global_iter(runner) + 1)
+                        else:                   # Scalar
+                            self.writer.add_scalar('model_by_iter/' + name, param.flatten(), get_global_iter(runner) + 1)
+                            if hasattr(param, "grad") and param.grad is not None:
+                                self.writer.add_scalar('model_by_iter/' + name  + "_grad", param.grad.flatten(), get_global_iter(runner) + 1)

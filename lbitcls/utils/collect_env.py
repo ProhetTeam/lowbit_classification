@@ -9,7 +9,7 @@ import torch
 import torchvision
 
 import lbitcls
-
+import torch.distributed as dist
 
 def collect_env():
     """Collect the information of the running environments."""
@@ -60,7 +60,15 @@ def collect_env():
     '''
     return env_info
 
+def get_rank():
+    if dist.is_available() and dist.is_initialized():
+        rank = dist.get_rank()
+    else:
+        rank = 0
+    return rank
 
 if __name__ == '__main__':
     for name, val in collect_env().items():
         print(f'{name}: {val}')
+
+

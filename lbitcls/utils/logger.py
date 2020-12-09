@@ -1,7 +1,7 @@
 import logging
 
 from mmcv.utils import get_logger
-
+import torch.distributed as dist
 
 def get_root_logger(log_file=None, log_level=logging.INFO):
     """Get root logger.
