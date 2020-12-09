@@ -4,6 +4,10 @@ from mmcv.runner.dist_utils import master_only
 from mmcv.runner import HOOKS
 from torch.utils.data import DataLoader
 from mmcv.runner.hooks.logger import LoggerHook
+import torch
+import numpy as np
+import seaborn.apionly as sns
+from .utils import CompareMultiLayerDist
 
 @HOOKS.register_module()
 class TensorboardLoggerHookV2(LoggerHook):
@@ -14,12 +18,18 @@ class TensorboardLoggerHookV2(LoggerHook):
                  reset_flag=True,
                  by_epoch=True,
                  weight_vis_interval = 1,
-                 by_iter=False):
+                 by_iter=False,
+                 cmp_multilayer_dist = False):
         super(TensorboardLoggerHookV2, self).__init__(interval, ignore_last,
                                                     reset_flag, by_epoch)
         self.log_dir = log_dir
         self.weight_vis_interval = weight_vis_interval
         self.by_iter = by_iter
+        self.cmp_multilayer_dist = cmp_multilayer_dist
+        
+        self.drawers = []
+        if self.cmp_multilayer_dist:
+            self.drawers.append(CompareMultiLayerDist())
 
     @master_only
     def before_run(self, runner):
@@ -41,6 +51,11 @@ class TensorboardLoggerHookV2(LoggerHook):
         if self.log_dir is None:
             self.log_dir = osp.join(runner.work_dir, 'tf_logs')
         self.writer = SummaryWriter(self.log_dir)
+
+        ## TODO : Show Network Structure
+        #self.writer.add_graph(runner.model, 
+        #                      {'img': torch.rand((1,3,224,224)), 
+        #                       'gt_label':torch.tensor([1], dtype = torch.int)})
 
     @master_only
     def log(self, runner):
@@ -70,12 +85,22 @@ class TensorboardLoggerHookV2(LoggerHook):
             if self.reset_flag:
                 runner.log_buffer.clear_output()
 
+            ## Default drawers
             if runner.mode == 'train' and self.every_n_epochs(runner, self.weight_vis_interval):
                 for name, param in runner.model.named_parameters():
                     if 'bn' not in name:
-                        self.writer.add_histogram('model_by_epoch/' +  name, param, self.get_epoch(runner))
-                        if hasattr(param, "grad") and param.grad is not None:
-                            self.writer.add_histogram('model_by_epoch/' + name + "_grad", param.grad, self.get_epoch(runner))
+                        if not param.numel() == 1: # Tensor
+                            self.writer.add_histogram('model_by_epoch/' +  name, param, self.get_epoch(runner))
+                            if hasattr(param, "grad") and param.grad is not None:
+                                self.writer.add_histogram('model_by_epoch/' + name + "_grad", param.grad, self.get_epoch(runner))
+                        else:
+                            self.writer.add_scalar('model_by_epoch/' +  name, param, self.get_epoch(runner))
+                            if hasattr(param, "grad") and param.grad is not None:
+                                self.writer.add_scalar('model_by_epoch/' + name + "_grad", param.grad, self.get_epoch(runner))
+
+                ## Customer Drawers list
+                for draw in self.drawers:
+                    draw(self.writer, runner)
 
     @master_only
     def after_run(self, runner):
