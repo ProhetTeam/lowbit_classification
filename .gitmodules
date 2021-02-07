@@ -4,3 +4,6 @@
 [submodule "thirdparty/modelzoo"]
 	path = thirdparty/modelzoo
 	url = git@git-core.megvii-inc.com:tanfeiyang/modelzoo.git
+[submodule "thirdparty/mtransformer"]
+	path = thirdparty/mtransformer
+	url = git@git-core.megvii-inc.com:zhangyi08/mtransformer.git
