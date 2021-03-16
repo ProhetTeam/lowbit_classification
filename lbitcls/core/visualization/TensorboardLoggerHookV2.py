@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 from mmcv.runner.hooks.logger import LoggerHook
 import torch
 import numpy as np
-import seaborn.apionly as sns
 from .utils import CompareMultiLayerDist
 
 @HOOKS.register_module()
@@ -107,7 +106,7 @@ class TensorboardLoggerHookV2(LoggerHook):
         self.writer.close()
 
     
-    @master_only
+    
     def after_train_iter(self, runner):
 
         def get_global_iter(runner):
@@ -117,7 +116,17 @@ class TensorboardLoggerHookV2(LoggerHook):
             return (get_global_iter(runner) + 1 ) % n == 0 if n > 0 else False
 
         ### 1. draw training : val loss top1, top1 , and etc
-        if runner.log_buffer.ready:
+        
+        '''
+        if self.by_epoch and self.every_n_inner_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif not self.by_epoch and self.every_n_iters(runner, self.interval):
+            runner.log_buffer.average(self.interval)
+        elif self.end_of_epoch(runner) and not self.ignore_last:
+            # not precise but more stable
+            runner.log_buffer.average(self.interval)
+        
+        if runner.log_buffer.ready and hasattr(self, 'writer'):
             tags = self.get_loggable_tags(runner, allow_text=True)
             for tag, val in tags.items():
                 if isinstance(val, str):
@@ -126,10 +135,12 @@ class TensorboardLoggerHookV2(LoggerHook):
                     self.writer.add_scalar(tag, val, get_global_iter(runner) + 1)
             if self.reset_flag:
                 runner.log_buffer.clear_output()
-        
+        '''
+        super(TensorboardLoggerHookV2, self).after_train_iter(runner)
         ### 2. Draw Model Paras: such as weights, bias, and etc parameters distribution.
         if runner.mode == 'train' and \
             self.by_iter and \
+            hasattr(self, 'writer') and \
             every_n_global_iter(runner, self.interval):
                 for name, param in runner.model.named_parameters():
                     if 'bn' not in name:

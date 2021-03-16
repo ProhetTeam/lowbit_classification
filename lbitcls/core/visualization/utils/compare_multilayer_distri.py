@@ -74,14 +74,15 @@ class CompareMultiLayerDist(metaclass=ABCMeta):
         for name, para in runner.model.named_parameters():
             if name not in valid_weight_name:
                 continue
-            x = pd.Series(para.detach().numpy().flatten(), name = 'bin val')
+            x = pd.Series(para.cpu().detach().numpy().flatten(), name = 'bin val')
             sns.distplot(x, 
                          bins = self.bins,
                          hist_kws = {'density' : True},
                          kde = True,
                          rug = False,
-                         label = name, 
-                         ax = axes[idx])
+                         label = name,  
+                         ax = axes[idx]
+                         )
             sns.kdeplot(x,
                         shade = True,
                         color = self.colors[idx],
