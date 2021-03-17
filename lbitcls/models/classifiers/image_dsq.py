@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from ..builder import CLASSIFIERS, build_backbone, build_head, build_neck
 from .base import BaseClassifier
-from lbitcls.mtransformer.DSQ import DSQConv, DSQConvV2
+from thirdparty.mtransformer.DSQ import DSQConv, DSQConvV2
 
 
 @CLASSIFIERS.register_module()
