@@ -9,16 +9,13 @@ import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist
 
-#import git
-#repo = git.Repo('.', search_parent_directories=True)
-#sys.path.insert(0, str(repo.working_tree_dir))
 
 from lbitcls import __version__
 from lbitcls.datasets import build_dataset
 from lbitcls.utils import collect_env, get_root_logger
 from lbitcls.models import build_classifier
 from lbitcls.apis import set_random_seed, train_classifier
-from lbitcls.mtransformer import build_mtransformer
+from thirdparty.mtransformer import build_mtransformer
 
 
 def parse_args():
