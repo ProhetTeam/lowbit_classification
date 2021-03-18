@@ -166,7 +166,11 @@ if __name__ == "__main__":
         author_email='tanfeiyang@gmail.com',
         keywords='computer vision, object detection',
         url='https://git-core.megvii-inc.com/tanfeiyang/lowbit_classification',
-        packages=find_packages(exclude=('thirdparty/configs', 'tools', 'demo')),
+        packages=find_packages(exclude=('thirdparty/configs', 
+                                        'thirdparty/modelzoo', 
+                                        'thirdparty/mtransformer',
+                                        'thirdparty/model_analysis_tool',
+                                        'tools', 'demo')),
         #package_data={'lbitcls.ops': ['*/*.so']},
         classifiers=[
             'Development Status :: 4 - Beta',
