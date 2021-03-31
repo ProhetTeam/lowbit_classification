@@ -9,7 +9,7 @@ from mmcv.runner import load_checkpoint
 
 from lbitcls.datasets.pipelines import Compose
 from lbitcls.models import build_classifier
-
+from thirdparty.mtransformer import build_mtransformer
 
 def init_model(config, checkpoint=None, device='cuda:0'):
     """Initialize a classifier from config file.
@@ -30,6 +30,11 @@ def init_model(config, checkpoint=None, device='cuda:0'):
                         f'but got {type(config)}')
     config.model.pretrained = None
     model = build_classifier(config.model)
+
+    if hasattr(config, "quant_transformer"):
+        model_transformer = build_mtransformer(config.quant_transformer)
+        model = model_transformer(model)
+
     if checkpoint is not None:
         map_loc = 'cpu' if device == 'cpu' else None
         checkpoint = load_checkpoint(model, checkpoint, map_location=map_loc)
