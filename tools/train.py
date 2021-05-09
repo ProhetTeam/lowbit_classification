@@ -56,6 +56,10 @@ def parse_args():
         choices=['none', 'pytorch'],
         default='none',
         help='job launcher')
+    parser.add_argument(
+        '--sycbn',
+        action='store_true',
+        help='whether not to open syncbn')
     parser.add_argument('--local_rank', type=int, default=0)
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
@@ -68,6 +72,7 @@ def main():
     args = parse_args()
 
     cfg = Config.fromfile(args.config)
+
     if args.options is not None:
         cfg.merge_from_dict(args.options)
     # set cudnn_benchmark
@@ -148,6 +153,10 @@ def main():
     if hasattr(cfg, "quant_transformer"):
         model_transformer = build_mtransformer(cfg.quant_transformer)
         model = model_transformer(model, logger= logger)
+    
+    if args.sycbn is True or cfg.get("sycbn", False):
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        logger.info('Using SyncBatchNorm()')
 
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
