@@ -32,11 +32,14 @@ def infer(model, img):
 
 
 configs = ['thirdparty/configs/benchmark/config1_res18_float_1m_b64.py',
-           'thirdparty/configs/LSQDPlus/config4_res18_lsqdplus_int4_updatelr4x_weightloss_4m.py']
+           'thirdparty/configs/LSQDPlus/config4_res18_lsqdplus_int4_updatelr4x_weightloss_4m.py',
+           'thirdparty/configs/LSQDPlus/config6_res18_lsqdplus_int3_allchangenoweightloss_4m.py',]
 checkpoints = ['thirdparty/modelzoo/res18.pth',
-               'work_dirs/LSQDPlus/config4_res18_lsqdplus_int4_updatelr4x_weightloss_4m/latest.pth']
-extra_names = ['res18-float', 
-               'res18-int4']
+               'work_dirs/LSQDPlus/config4_res18_lsqdplus_int4_updatelr4x_weightloss_4m/latest.pth',
+               'work_dirs/LSQDPlus/config6_res18_lsqdplus_int3_allchangenoweightloss_4m/latest.pth']
+extra_names = ['r18-fp32', 
+               'r18-int4',
+               'r18-int3']
 
 
 def main():
