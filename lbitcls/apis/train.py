@@ -9,7 +9,7 @@ from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner, OptimizerHook,
 from lbitcls.core import DistEvalHook, EvalHook, Fp16OptimizerHook
 from lbitcls.datasets import build_dataloader, build_dataset
 from lbitcls.utils import get_root_logger
-
+from lbitcls.core import PrecisebnHook, DistPrecisebnHook
 
 def set_random_seed(seed, deterministic=False):
     """Set random seed.
@@ -95,6 +95,12 @@ def train_classifier(model,
                                    cfg.get('momentum_config', None))
     if distributed:
         runner.register_hook(DistSamplerSeedHook())
+    
+    # Precise BatchNorm Hooks 
+    if cfg.get('precisebn', None) is not None:
+        precisebn_cfg = cfg.get('precisebn')
+        precisebn_hook = DistPrecisebnHook if distributed else PrecisebnHook
+        runner.register_hook(precisebn_hook(data_loaders[0], logger=logger, **precisebn_cfg))
 
     # register eval hooks
     if validate:

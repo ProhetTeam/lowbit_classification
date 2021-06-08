@@ -157,7 +157,7 @@ def main():
     if args.sycbn is True or cfg.get("sycbn", False):
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         logger.info('Using SyncBatchNorm()')
-
+    
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
     train_classifier(
