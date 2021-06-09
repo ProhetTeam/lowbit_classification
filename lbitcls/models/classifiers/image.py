@@ -1,8 +1,9 @@
 import torch.nn as nn
-
+import torch
 from ..builder import CLASSIFIERS, build_backbone, build_head, build_neck
 from .base import BaseClassifier
-
+from thirdparty.mtransformer.ABQAT import ABQATConv2d
+from thirdparty.mtransformer.LSQPlus import LSQDPlusConv2d
 
 @CLASSIFIERS.register_module()
 class ImageClassifier(BaseClassifier):
@@ -58,6 +59,46 @@ class ImageClassifier(BaseClassifier):
         loss = self.head.forward_train(x, gt_label)
         losses.update(loss)
 
+        loss_extra = {}
+        for _, layer in self.named_modules():
+            if isinstance(layer, ABQATConv2d):
+                if hasattr(layer, 'weight_quant_loss'):
+                    try:
+                        loss_extra['weight_quant_loss'] += layer.weight_quant_loss
+                    except:
+                        loss_extra['weight_quant_loss'] = layer.weight_quant_loss
+
+                if hasattr(layer, 'quant_error_loss'):
+                    try:
+                        loss_extra['quant_error_loss'] += layer.quant_error_loss
+                    except:
+                        loss_extra['quant_error_loss'] = layer.quant_error_loss
+                        
+                if hasattr(layer, 'act_quant_loss'):
+                    try:
+                        loss_extra['act_quant_loss'] += layer.act_quant_loss
+                    except:
+                        loss_extra['act_quant_loss'] = layer.act_quant_loss 
+                        
+            if isinstance(layer, LSQDPlusConv2d):
+                if hasattr(layer, 'weight_quant_loss'):
+                    try:
+                        loss_extra['weight_quant_loss'] += layer.weight_quant_loss
+                    except:
+                        loss_extra['weight_quant_loss'] = layer.weight_quant_loss  
+                if hasattr(layer, 'quant_error_loss'):
+                    try:
+                        loss_extra['quant_error_loss'] += layer.quant_error_loss
+                    except:
+                        loss_extra['quant_error_loss'] = layer.quant_error_loss
+            
+                if hasattr(layer, 'act_quant_loss'):
+                    try:
+                        loss_extra['act_quant_loss'] += layer.act_quant_loss
+                    except:
+                        loss_extra['act_quant_loss'] = layer.act_quant_loss 
+                        
+        losses.update(loss_extra) 
         return losses
 
     def simple_test(self, img):
