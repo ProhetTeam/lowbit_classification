@@ -7,7 +7,15 @@ import mmcv
 import torch.distributed as dist
 from mmcv.runner import get_dist_info
 import time
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
+import torch.nn as nn
 
+BN_MODULE_TYPES: Tuple[Type[nn.Module]] = (
+    torch.nn.BatchNorm1d,
+    torch.nn.BatchNorm2d,
+    torch.nn.BatchNorm3d,
+    torch.nn.SyncBatchNorm,
+)
 
 def _scaled_all_reduce(tensors):
     """Performs the scaled all_reduce operation on the provided tensors.
@@ -35,7 +43,7 @@ def _scaled_all_reduce(tensors):
 
 
 @torch.no_grad()
-def _precisebn_stats(model, data_loader, num_samples, dist = False):
+def _precisebn_stats(model, data_loader, num_samples, logger = None, dist = False):
     if dist:
         rank, world_size = get_dist_info()
         num_samples = max(num_samples, data_loader.batch_size * world_size)
@@ -45,7 +53,11 @@ def _precisebn_stats(model, data_loader, num_samples, dist = False):
         num_iter = int(num_samples / data_loader.batch_size)
     num_iter = min(num_iter, len(data_loader))
 
-    bns = [m for m in model.modules() if isinstance(m, torch.nn.BatchNorm2d)]
+    bns = [m for m in model.modules() if isinstance(m, BN_MODULE_TYPES)]
+    assert len(bns) != 0, 'Your model has no BN module, Please turn off precise bn!'
+    if logger is not None:
+        if (dist == False) or ( dist and rank == 0):
+            logger.info(r'Model has {} BN modules'.format(len(bns)))
     running_means = [torch.zeros_like(bn.running_mean) for bn in bns]
     running_vars = [torch.zeros_like(bn.running_var) for bn in bns]
     momentums = [bn.momentum for bn in bns]
@@ -116,5 +128,5 @@ class DistPrecisebnHook(PrecisebnHook):
             return
         
         self.logger.info('\nStart Running Precise BatchNorm2D !')
-        _precisebn_stats(runner.model, self.dataloader, self.num_samples, dist = True)
+        _precisebn_stats(runner.model, self.dataloader, self.num_samples, logger = self.logger,dist = True)
         self.logger.info('\nEnd Running Precise BatchNorm2D !')
