@@ -8,7 +8,7 @@ import torch
 from mmcv.onnx import register_extra_symbolics
 from mmcv.runner import load_checkpoint
 
-from mmcls.models import build_classifier
+from lbitcls.models import build_classifier
 
 torch.manual_seed(3)
 

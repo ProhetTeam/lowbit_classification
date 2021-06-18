@@ -14,22 +14,28 @@ from collections import defaultdict
 import plotly.figure_factory as ff
 import pandas as pd
 
-of.offline.init_notebook_mode(connected=True)
+#of.offline.init_notebook_mode(connected=True)
 
 keys = ['top-1',
         'top-5']
 
 use_one_fig = False
-logs_path = ['work_dirs/LSQDPlus/config1_res18_lsq_int4_updatelr4x_4m/20210518_113809.log.json',
-              'work_dirs/LSQDPlus/config2_res18_lsqdplus_int4_updatelr4x_offset_4m/20210519_095439.log.json',
-              'work_dirs/LSQDPlus/config3_res18_lsqdplus_int4_updatelr4x_init3_4m/20210518_230312.log.json',
-              "work_dirs/LSQDPlus/config4_res18_lsqdplus_int4_updatelr4x_weightloss_4m/20210519_100857.log.json",
-              "work_dirs/LSQDPlus/config4_res18_lsqdplus_int4_lr4x_convQuantloss_4m/20210519_185754.log.json"]
-extra_name = ["res18_lsq_int4",
-              "res18_lsqdplus_offset",
-              "res18_lsqdplus_init3",
-              "res18_lsqdplus_weightlayerloss",
-              "res18_lsqdplus_actlayerloss"]
+logs_path = ['work_dirs/LSQDPlus/config6_res18_lsqdplus_int3_allchangenoweightloss_coslr_precisebn_syncbn_4m/20210609_204002.log.json',
+              "work_dirs/temp/config6_res18_lsqdplus_int3_allchangenoweightloss_coslr_4m_20210521_185901.log.json",
+              'work_dirs/LSQDPlus/config7_res18_lsqdplus_2w4f_allchangenoweightloss_precisebn_4m/20210610_110127.log.json',
+              "work_dirs/temp/config7_res18_lsqdplus_2w4f_allchangenoweightloss_coslr_4m_20210522_084946.log.json",
+              'work_dirs/LSQDPlus/config13_mobilenetv2_lsqdplus_int3_addoffset_lr4x_precisebn_4m/20210611_130010.log.json',
+              "work_dirs/temp/config13_mobilenetv2_lsqdplus_int3_addoffset_lr4x_4m_20210529_155855.log.json",
+              "work_dirs/LSQDPlus/config14_mobilenetv2_lsqdplus_2w4f_addoffset_lr4x_withpretrain_precisebn_4m/20210610_213332.log.json",
+              "work_dirs/temp/config14_mobilenetv2_lsqdplus_2w4f_addoffset_lr4x_withpretrain_4m_0210601_102918.log.json"]
+extra_name = ["res18_precisebn_int3",
+              "res18_bn_int3",
+              "res18_precisebn_2w4f",
+              "res18_bn_2w4f",
+              "mbv2_precisebn_int3",
+              "mbv2_bn_int3",
+              "mbv2_precisebn_2w4f",
+              "mbv2_bn_2w4f"]
 
 def load_json_logs(json_log, extra_name = ""):
     log_dicts = defaultdict(list)
