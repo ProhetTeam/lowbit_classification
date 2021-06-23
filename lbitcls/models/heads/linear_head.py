@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import normal_init
+from torch.nn.modules import loss
 
 from ..builder import HEADS
 from .cls_head import ClsHead
@@ -23,6 +24,7 @@ class LinearClsHead(ClsHead):
                  in_channels,
                  drop_out_ratio = None,
                  loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
+                 return_feat = False,
                  topk=(1, )):
         super(LinearClsHead, self).__init__(loss=loss, topk=topk)
         self.in_channels = in_channels
@@ -32,6 +34,7 @@ class LinearClsHead(ClsHead):
             raise ValueError(
                 f'num_classes={num_classes} must be a positive integer')
         self.drop_out_ratio = drop_out_ratio 
+        self.return_feat = return_feat
         self._init_layers()
 
     def _init_layers(self):
@@ -59,7 +62,10 @@ class LinearClsHead(ClsHead):
         else:
             cls_score = self.fc(x)
         losses = self.loss(cls_score, gt_label)
-        return losses
+        if self.return_feat:
+            return losses, cls_score
+        else:
+            return losses
 
 @HEADS.register_module()
 class ConvClsHead(ClsHead):

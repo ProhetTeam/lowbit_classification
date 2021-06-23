@@ -1,3 +1,7 @@
+r""" 
+    PART1: Thsis part is just for classication.
+"""
+
 import torch.nn as nn
 from mmcv.utils import Registry, build_from_cfg
 
@@ -36,3 +40,13 @@ def build_loss(cfg):
 
 def build_classifier(cfg):
     return build(cfg, CLASSIFIERS)
+
+r""" 
+    PART2: Thsis part is just for distillation.  
+"""
+
+DISTILLERS = Registry('distillers')
+DISTILL_LOSSES = Registry('loss')
+
+def build_distiller(cfg):
+    return build(cfg, DISTILLERS)
