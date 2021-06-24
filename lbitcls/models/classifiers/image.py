@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch
 from ..builder import CLASSIFIERS, build_backbone, build_head, build_neck
+from ..utils import BatchCutMixLayer, BatchMixupLayer
 from .base import BaseClassifier
 from thirdparty.mtransformer.ABQAT import ABQATConv2d
 from thirdparty.mtransformer.LSQPlus import LSQDPlusConv2d
@@ -8,8 +9,14 @@ from thirdparty.mtransformer.LSQPlus import LSQDPlusConv2d
 @CLASSIFIERS.register_module()
 class ImageClassifier(BaseClassifier):
 
-    def __init__(self, backbone, neck=None, head=None, pretrained=None):
+    def __init__(self,
+                 backbone,
+                 neck=None,
+                 head=None,
+                 pretrained=None,
+                 train_cfg=None):
         super(ImageClassifier, self).__init__()
+
         self.backbone = build_backbone(backbone)
 
         if neck is not None:
@@ -17,6 +24,17 @@ class ImageClassifier(BaseClassifier):
 
         if head is not None:
             self.head = build_head(head)
+
+        self.mixup, self.cutmix = None, None
+        if train_cfg is not None:
+            mixup_cfg = train_cfg.get('mixup', None)
+            cutmix_cfg = train_cfg.get('cutmix', None)
+            assert mixup_cfg is None or cutmix_cfg is None, \
+                'Mixup and CutMix can not be set simultaneously.'
+            if mixup_cfg is not None:
+                self.mixup = BatchMixupLayer(**mixup_cfg)
+            if cutmix_cfg is not None:
+                self.cutmix = BatchCutMixLayer(**cutmix_cfg)
 
         self.init_weights(pretrained=pretrained)
 
@@ -33,8 +51,7 @@ class ImageClassifier(BaseClassifier):
             self.head.init_weights()
 
     def extract_feat(self, img):
-        """Directly extract features from the backbone + neck
-        """
+        """Directly extract features from the backbone + neck."""
         x = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
@@ -46,13 +63,19 @@ class ImageClassifier(BaseClassifier):
         Args:
             img (Tensor): of shape (N, C, H, W) encoding input images.
                 Typically these should be mean centered and std scaled.
-
-            gt_label (Tensor): of shape (N, 1) encoding the ground-truth label
-                of input images.
-
+            gt_label (Tensor): It should be of shape (N, 1) encoding the
+                ground-truth label of input images for single label task. It
+                shoulf be of shape (N, C) encoding the ground-truth label
+                of input images for multi-labels task.
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
+        if self.mixup is not None:
+            img, gt_label = self.mixup(img, gt_label)
+
+        if self.cutmix is not None:
+            img, gt_label = self.cutmix(img, gt_label)
+
         x = self.extract_feat(img)
 
         losses = dict()

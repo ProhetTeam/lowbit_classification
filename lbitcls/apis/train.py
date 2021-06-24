@@ -1,10 +1,11 @@
 import random
+from re import T
 
 import numpy as np
 import torch
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner, OptimizerHook,
-                         build_optimizer)
+                         build_optimizer, build_runner)
 
 from lbitcls.core import DistEvalHook, EvalHook, Fp16OptimizerHook
 from lbitcls.datasets import build_dataloader, build_dataset
@@ -70,12 +71,23 @@ def train_classifier(model,
             
     # build runner
     optimizer = build_optimizer(model, cfg.optimizer)
-    runner = EpochBasedRunner(
-        model,
-        optimizer=optimizer,
-        work_dir=cfg.work_dir,
-        logger=logger,
-        meta=meta)
+    if cfg.get('runner', None) is not None:
+        runner = build_runner(
+        cfg.runner,
+        default_args=dict(
+            model=model,
+            batch_processor=None,
+            optimizer=optimizer,
+            work_dir=cfg.work_dir,
+            logger=logger,
+            meta=meta))
+    else:
+        runner = EpochBasedRunner(
+            model,
+            optimizer=optimizer,
+            work_dir=cfg.work_dir,
+            logger=logger,
+            meta=meta)
     # an ugly workaround to make .log and .log.json filenames the same
     runner.timestamp = timestamp
 
@@ -121,5 +133,8 @@ def train_classifier(model,
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
     
-    with torch.autograd.set_detect_anomaly(cfg.get('debug_backward', False)): 
-            runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
+    with torch.autograd.set_detect_anomaly(cfg.get('debug_backward', False)):
+            try:
+                runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
+            except:
+                runner.run(data_loaders, cfg.workflow)
