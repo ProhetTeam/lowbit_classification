@@ -1,4 +1,5 @@
 import os.path as osp
+from subprocess import run
 
 from mmcv.runner import Hook
 from torch.utils.data import DataLoader
@@ -9,6 +10,7 @@ from mmcv.runner import get_dist_info
 import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
 import torch.nn as nn
+from lbitcls.models.distillers import BaseDistiller
 
 BN_MODULE_TYPES: Tuple[Type[nn.Module]] = (
     torch.nn.BatchNorm1d,
@@ -118,7 +120,10 @@ class PrecisebnHook(Hook):
             return
         
         self.logger.info('\nStart Running Precise BatchNorm2D !')
-        _precisebn_stats(runner.model, self.dataloader, self.num_samples)
+        if isinstance(runner.model, BaseDistiller):
+            _precisebn_stats(runner.model.student_model, self.dataloader, self.num_samples)
+        else:
+            _precisebn_stats(runner.model, self.dataloader, self.num_samples)
         self.logger.info('\nEnd Running Precise BatchNorm2D !') 
 
 class DistPrecisebnHook(PrecisebnHook):
@@ -128,5 +133,8 @@ class DistPrecisebnHook(PrecisebnHook):
             return
         
         self.logger.info('\nStart Running Precise BatchNorm2D !')
-        _precisebn_stats(runner.model, self.dataloader, self.num_samples, logger = self.logger,dist = True)
+        if isinstance(runner.model, BaseDistiller):
+            _precisebn_stats(runner.model.student_model, self.dataloader, self.num_samples, logger = self.logger,dist = True)
+        else:
+            _precisebn_stats(runner.model, self.dataloader, self.num_samples, logger = self.logger,dist = True)
         self.logger.info('\nEnd Running Precise BatchNorm2D !')
