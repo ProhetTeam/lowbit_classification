@@ -1,3 +1,4 @@
+from lbitcls.core.lossupdater import loss_weight_decay
 import random
 from re import T
 
@@ -114,6 +115,13 @@ def train_classifier(model,
         precisebn_hook = DistPrecisebnHook if distributed else PrecisebnHook
         runner.register_hook(precisebn_hook(data_loaders[0], logger=logger, **precisebn_cfg))
 
+    # Loss Weight decat Hook
+    if cfg.get('LossWeightDecay', None) is not None:
+        from lbitcls.core import  LossWeightDecay
+        loss_weight_hook_cfg = cfg.get('LossWeightDecay')
+        loss_weight_hook = LossWeightDecay(**loss_weight_hook_cfg, logger = logger) 
+        runner.register_hook(loss_weight_hook)
+
     # register eval hooks
     if validate:
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
@@ -134,7 +142,7 @@ def train_classifier(model,
         runner.load_checkpoint(cfg.load_from)
     
     with torch.autograd.set_detect_anomaly(cfg.get('debug_backward', False)):
-            try:
+            if cfg.get('total_epochs', None) is not None:
                 runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
-            except:
+            else:
                 runner.run(data_loaders, cfg.workflow)

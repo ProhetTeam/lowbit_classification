@@ -1,3 +1,5 @@
+import torch
+from torch._C import set_flush_denormal
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules import loss
@@ -33,3 +35,36 @@ class DistillKL(nn.Module):
             **kwargs)
         losses.update({'KLloss':loss_kl})
         return losses
+
+@LOSSES.register_module()
+class FeatureLossV1(nn.Module):
+    def __init__(self, 
+                 beta = 0.1,
+                 loss_weight = 1.0):
+        super(FeatureLossV1, self).__init__()
+        self.loss_weight = loss_weight
+        self.beta = beta  
+
+    def forward(self,
+                feat_student,
+                feat_teacher,
+                return_value = False,
+                **kwargs):
+        losses = dict()
+
+        feat_loss_weight = self.loss_weight * \
+            torch.exp(feat_teacher.abs() * self.beta + self.dist(feat_teacher))
+        feat_loss = (feat_loss_weight * (feat_student - feat_teacher)).abs().mean()
+        if return_value:
+            return feat_loss
+        else:
+            losses.update({'FeatLossV1':feat_loss})
+            return losses
+    
+    def dist(self, data, bins = 600):
+        bin_size = (data.max() - data.min()) / bins
+        hisc = data.detach().histc(bins = bins) / data.numel()
+        xbin_idx = ((data - data.min()) / bin_size).floor().clamp(0, bins - 1)
+        res = hisc[xbin_idx.long()]
+        res = res/res.sum()
+        return res
