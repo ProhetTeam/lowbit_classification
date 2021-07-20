@@ -233,3 +233,30 @@ def support(pred, target, average_mode='macro'):
         else:
             raise ValueError(f'Unsupport type of averaging {average_mode}.')
     return res
+
+def roc(pred, target, average_mode='macro', thrs=None):
+    allowed_average_mode = ['macro', 'none']
+    if average_mode not in allowed_average_mode:
+        raise ValueError(f'Unsupport type of averaging {average_mode}.')
+
+    if isinstance(pred, torch.Tensor):
+        pred = pred.numpy()
+    if isinstance(target, torch.Tensor):
+        target = target.numpy()
+    assert (isinstance(pred, np.ndarray) and isinstance(target, np.ndarray)),\
+        (f'pred and target should be torch.Tensor or np.ndarray, '
+         f'but got {type(pred)} and {type(target)}.')
+
+    from sklearn.metrics import roc_curve, auc
+
+    n_classes = pred.shape[1] 
+    label = np.indices(pred.shape)[1] == target.reshape(-1, 1)
+
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(label[:, i], pred[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i]) * 100
+    roc_auc_micro = sum(roc_auc.values()) / (len(roc_auc) + 1e-10)
+    return roc_auc_micro, roc_auc

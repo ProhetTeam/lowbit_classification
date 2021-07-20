@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 from torch.utils.data import Dataset
 
-from mmcls.core.evaluation import precision_recall_f1, support
+from lbitcls.core.evaluation import precision_recall_f1, support, roc
 from lbitcls.models.losses import accuracy
 from .pipelines import Compose
 
@@ -81,7 +81,7 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
         else:
             metrics = metric
         allowed_metrics = [
-            'accuracy', 'precision', 'recall', 'f1_score', 'support'
+            'accuracy', 'precision', 'recall', 'f1_score', 'support', 'auc'
         ]
         eval_results = {}
         results = np.vstack(results)
@@ -137,5 +137,9 @@ class BaseDataset(Dataset, metaclass=ABCMeta):
                         })
                     else:
                         eval_results[key] = values
+        
+        if 'auc' in metrics:
+            roc_auc_micro, roc_auc = roc(results, gt_labels, average_mode = average_mode)
+            eval_results['auc'] = roc_auc_micro
 
         return eval_results
