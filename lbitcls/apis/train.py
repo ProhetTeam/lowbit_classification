@@ -142,7 +142,7 @@ def train_classifier(model,
         runner.load_checkpoint(cfg.load_from)
     
     with torch.autograd.set_detect_anomaly(cfg.get('debug_backward', False)):
-            if cfg.get('total_epochs', None) is not None:
-                runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
-            else:
-                runner.run(data_loaders, cfg.workflow)
+        if cfg.get('total_epochs', None) is not None:
+            runner.run(data_loaders, cfg.workflow, cfg.total_epochs)
+        else:
+            runner.run(data_loaders, cfg.workflow)

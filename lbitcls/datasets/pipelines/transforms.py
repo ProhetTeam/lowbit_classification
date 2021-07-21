@@ -1,18 +1,19 @@
 import inspect
 import math
 import random
+from numbers import Number
+from typing import Sequence
 
 import mmcv
 import numpy as np
 
 from ..builder import PIPELINES
+from .compose import Compose
 
 try:
     import albumentations
-    from albumentations import Compose
 except ImportError:
     albumentations = None
-    Compose = None
 
 
 @PIPELINES.register_module()
@@ -85,9 +86,9 @@ class RandomCrop(object):
         if width == target_width and height == target_height:
             return 0, 0, height, width
 
-        xmin = random.randint(0, height - target_height)
-        ymin = random.randint(0, width - target_width)
-        return xmin, ymin, target_height, target_width
+        ymin = random.randint(0, height - target_height)
+        xmin = random.randint(0, width - target_width)
+        return ymin, xmin, target_height, target_width
 
     def __call__(self, results):
         """
@@ -118,10 +119,15 @@ class RandomCrop(object):
                     pad_val=self.pad_val,
                     padding_mode=self.padding_mode)
 
-            xmin, ymin, height, width = self.get_params(img, self.size)
+            ymin, xmin, height, width = self.get_params(img, self.size)
             results[key] = mmcv.imcrop(
                 img,
-                np.array([ymin, xmin, ymin + width - 1, xmin + height - 1]))
+                np.array([
+                    xmin,
+                    ymin,
+                    xmin + width - 1,
+                    ymin + height - 1,
+                ]))
         return results
 
     def __repr__(self):
@@ -138,44 +144,71 @@ class RandomResizedCrop(object):
     is made. This crop is finally resized to given size.
 
     Args:
-        size (sequence or int): Desired output size of the crop. If size is an
+        size (sequence | int): Desired output size of the crop. If size is an
             int instead of sequence like (h, w), a square crop (size, size) is
             made.
         scale (tuple): Range of the random size of the cropped image compared
-            to the original image. Default: (0.08, 1.0).
+            to the original image. Defaults to (0.08, 1.0).
         ratio (tuple): Range of the random aspect ratio of the cropped image
-            compared to the original image. Default: (3. / 4., 4. / 3.).
+            compared to the original image. Defaults to (3. / 4., 4. / 3.).
+        max_attempts (int): Maxinum number of attempts before falling back to
+            Central Crop. Defaults to 10.
+        efficientnet_style (bool): Whether to use efficientnet style Random
+            ResizedCrop. Defaults to False.
+        min_covered (Number): Minimum ratio of the cropped area to the original
+             area. Only valid if efficientnet_style is true. Defaults to 0.1.
+        crop_padding (int): The crop padding parameter in efficientnet style
+            center crop. Only valid if efficientnet_style is true.
+            Defaults to 32.
         interpolation (str): Interpolation method, accepted values are
-            'nearest', 'bilinear', 'bicubic', 'area', 'lanczos'. Default:
+            'nearest', 'bilinear', 'bicubic', 'area', 'lanczos'. Defaults to
             'bilinear'.
         backend (str): The image resize backend type, accpeted values are
-            `cv2` and `pillow`. Default: `cv2`.
+            `cv2` and `pillow`. Defaults to `cv2`.
     """
 
     def __init__(self,
                  size,
                  scale=(0.08, 1.0),
                  ratio=(3. / 4., 4. / 3.),
+                 max_attempts=10,
+                 efficientnet_style=False,
+                 min_covered=0.1,
+                 crop_padding=32,
                  interpolation='bilinear',
                  backend='cv2'):
-        if isinstance(size, (tuple, list)):
-            self.size = size
-        else:
+        if efficientnet_style:
+            assert isinstance(size, int)
             self.size = (size, size)
+            assert crop_padding >= 0
+        else:
+            if isinstance(size, (tuple, list)):
+                self.size = size
+            else:
+                self.size = (size, size)
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             raise ValueError('range should be of kind (min, max). '
-                             f'But received {scale}')
+                             f'But received scale {scale} and rato {ratio}.')
+        assert min_covered >= 0, 'min_covered should be no less than 0.'
+        assert isinstance(max_attempts, int) and max_attempts >= 0, \
+            'max_attempts mush be of typle int and no less than 0.'
+        assert interpolation in ('nearest', 'bilinear', 'bicubic', 'area',
+                                 'lanczos')
         if backend not in ['cv2', 'pillow']:
             raise ValueError(f'backend: {backend} is not supported for resize.'
                              'Supported backends are "cv2", "pillow"')
 
-        self.interpolation = interpolation
         self.scale = scale
         self.ratio = ratio
+        self.max_attempts = max_attempts
+        self.efficientnet_style = efficientnet_style
+        self.min_covered = min_covered
+        self.crop_padding = crop_padding
+        self.interpolation = interpolation
         self.backend = backend
 
     @staticmethod
-    def get_params(img, scale, ratio):
+    def get_params(img, scale, ratio, max_attempts=10):
         """Get parameters for ``crop`` for a random sized crop.
 
         Args:
@@ -184,16 +217,18 @@ class RandomResizedCrop(object):
                 compared to the original image size.
             ratio (tuple): Range of the random aspect ratio of the cropped
                 image compared to the original image area.
+            max_attempts (int): Maxinum number of attempts before falling back
+                to central crop. Defaults to 10.
 
         Returns:
-            tuple: Params (xmin, ymin, target_height, target_width) to be
-                passed to ``crop`` for a random sized crop.
+            tuple: Params (ymin, xmin, ymax, xmax) to be passed to `crop` for
+                a random sized crop.
         """
         height = img.shape[0]
         width = img.shape[1]
         area = height * width
 
-        for _ in range(10):
+        for _ in range(max_attempts):
             target_area = random.uniform(*scale) * area
             log_ratio = (math.log(ratio[0]), math.log(ratio[1]))
             aspect_ratio = math.exp(random.uniform(*log_ratio))
@@ -202,9 +237,11 @@ class RandomResizedCrop(object):
             target_height = int(round(math.sqrt(target_area / aspect_ratio)))
 
             if 0 < target_width <= width and 0 < target_height <= height:
-                xmin = random.randint(0, height - target_height)
-                ymin = random.randint(0, width - target_width)
-                return xmin, ymin, target_height, target_width
+                ymin = random.randint(0, height - target_height)
+                xmin = random.randint(0, width - target_width)
+                ymax = ymin + target_height - 1
+                xmax = xmin + target_width - 1
+                return ymin, xmin, ymax, xmax
 
         # Fallback to central crop
         in_ratio = float(width) / float(height)
@@ -217,28 +254,116 @@ class RandomResizedCrop(object):
         else:  # whole image
             target_width = width
             target_height = height
-        xmin = (height - target_height) // 2
-        ymin = (width - target_width) // 2
-        return xmin, ymin, target_height, target_width
+        ymin = (height - target_height) // 2
+        xmin = (width - target_width) // 2
+        ymax = ymin + target_height - 1
+        xmax = xmin + target_width - 1
+        return ymin, xmin, ymax, xmax
 
-    def __call__(self, results):
-        """
+    # https://github.com/kakaobrain/fast-autoaugment/blob/master/FastAutoAugment/data.py # noqa
+    @staticmethod
+    def get_params_efficientnet_style(img,
+                                      size,
+                                      scale,
+                                      ratio,
+                                      max_attempts=10,
+                                      min_covered=0.1,
+                                      crop_padding=32):
+        """Get parameters for ``crop`` for a random sized crop in efficientnet
+        style.
+
         Args:
-            img (ndarray): Image to be cropped and resized.
+            img (ndarray): Image to be cropped.
+            size (sequence): Desired output size of the crop.
+            scale (tuple): Range of the random size of the cropped image
+                compared to the original image size.
+            ratio (tuple): Range of the random aspect ratio of the cropped
+                image compared to the original image area.
+            max_attempts (int): Maxinum number of attempts before falling back
+                to central crop. Defaults to 10.
+            min_covered (Number): Minimum ratio of the cropped area to the
+                original area. Only valid if efficientnet_style is true.
+                Defaults to 0.1.
+            crop_padding (int): The crop padding parameter in efficientnet
+                style center crop. Defaults to 32.
 
         Returns:
-            ndarray: Randomly cropped and resized image.
+            tuple: Params (ymin, xmin, ymax, xmax) to be passed to `crop` for
+                a random sized crop.
         """
+        height, width = img.shape[:2]
+        area = height * width
+        min_target_area = scale[0] * area
+        max_target_area = scale[1] * area
+
+        for _ in range(max_attempts):
+            aspect_ratio = random.uniform(*ratio)
+            min_target_height = int(
+                round(math.sqrt(min_target_area / aspect_ratio)))
+            max_target_height = int(
+                round(math.sqrt(max_target_area / aspect_ratio)))
+
+            if max_target_height * aspect_ratio > width:
+                max_target_height = int((width + 0.5 - 1e-7) / aspect_ratio)
+                if max_target_height * aspect_ratio > width:
+                    max_target_height -= 1
+
+            max_target_height = min(max_target_height, height)
+            min_target_height = min(max_target_height, min_target_height)
+
+            # slightly differs from tf inplementation
+            target_height = int(
+                round(random.uniform(min_target_height, max_target_height)))
+            target_width = int(round(target_height * aspect_ratio))
+            target_area = target_height * target_width
+
+            # slight differs from tf. In tf, if target_area > max_target_area,
+            # area will be recalculated
+            if (target_area < min_target_area or target_area > max_target_area
+                    or target_width > width or target_height > height
+                    or target_area < min_covered * area):
+                continue
+
+            ymin = random.randint(0, height - target_height)
+            xmin = random.randint(0, width - target_width)
+            ymax = ymin + target_height - 1
+            xmax = xmin + target_width - 1
+
+            return ymin, xmin, ymax, xmax
+
+        # Fallback to central crop
+        img_short = min(height, width)
+        crop_size = size[0] / (size[0] + crop_padding) * img_short
+
+        ymin = max(0, int(round((height - crop_size) / 2.)))
+        xmin = max(0, int(round((width - crop_size) / 2.)))
+        ymax = min(height, ymin + crop_size) - 1
+        xmax = min(width, xmin + crop_size) - 1
+
+        return ymin, xmin, ymax, xmax
+
+    def __call__(self, results):
         for key in results.get('img_fields', ['img']):
             img = results[key]
-            xmin, ymin, target_height, target_width = self.get_params(
-                img, self.scale, self.ratio)
-            img = mmcv.imcrop(
-                img,
-                np.array([
-                    ymin, xmin, ymin + target_width - 1,
-                    xmin + target_height - 1
-                ]))
+            if self.efficientnet_style:
+                get_params_func = self.get_params_efficientnet_style
+                get_params_args = dict(
+                    img=img,
+                    size=self.size,
+                    scale=self.scale,
+                    ratio=self.ratio,
+                    max_attempts=self.max_attempts,
+                    min_covered=self.min_covered,
+                    crop_padding=self.crop_padding)
+            else:
+                get_params_func = self.get_params
+                get_params_args = dict(
+                    img=img,
+                    scale=self.scale,
+                    ratio=self.ratio,
+                    max_attempts=self.max_attempts)
+            ymin, xmin, ymax, xmax = get_params_func(**get_params_args)
+            img = mmcv.imcrop(img, bboxes=np.array([xmin, ymin, xmax, ymax]))
             results[key] = mmcv.imresize(
                 img,
                 tuple(self.size[::-1]),
@@ -247,11 +372,16 @@ class RandomResizedCrop(object):
         return results
 
     def __repr__(self):
-        format_string = self.__class__.__name__ + f'(size={self.size}'
-        format_string += f', scale={tuple(round(s, 4) for s in self.scale)}'
-        format_string += f', ratio={tuple(round(r, 4) for r in self.ratio)}'
-        format_string += f', interpolation={self.interpolation})'
-        return format_string
+        repr_str = self.__class__.__name__ + f'(size={self.size}'
+        repr_str += f', scale={tuple(round(s, 4) for s in self.scale)}'
+        repr_str += f', ratio={tuple(round(r, 4) for r in self.ratio)}'
+        repr_str += f', max_attempts={self.max_attempts}'
+        repr_str += f', efficientnet_style={self.efficientnet_style}'
+        repr_str += f', min_covered={self.min_covered}'
+        repr_str += f', crop_padding={self.crop_padding}'
+        repr_str += f', interpolation={self.interpolation}'
+        repr_str += f', backend={self.backend})'
+        return repr_str
 
 
 @PIPELINES.register_module()
@@ -268,7 +398,6 @@ class RandomGrayscale(object):
             - If input image is 1 channel: grayscale version is 1 channel.
             - If input image is 3 channel: grayscale version is 3 channel
                 with r == g == b.
-
     """
 
     def __init__(self, gray_prob=0.1):
@@ -306,7 +435,7 @@ class RandomFlip(object):
 
     Args:
         flip_prob (float): probability of the image being flipped. Default: 0.5
-        direction (str, optional): The flipping direction. Options are
+        direction (str): The flipping direction. Options are
             'horizontal' and 'vertical'. Default: 'horizontal'.
     """
 
@@ -338,6 +467,142 @@ class RandomFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + f'(flip_prob={self.flip_prob})'
+
+
+@PIPELINES.register_module()
+class RandomErasing(object):
+    """Randomly selects a rectangle region in an image and erase pixels.
+
+    Args:
+        erase_prob (float): Probability that image will be randomly erased.
+            Default: 0.5
+        min_area_ratio (float): Minimum erased area / input image area
+            Default: 0.02
+        max_area_ratio (float): Maximum erased area / input image area
+            Default: 0.4
+        aspect_range (sequence | float): Aspect ratio range of erased area.
+            if float, it will be converted to (aspect_ratio, 1/aspect_ratio)
+            Default: (3/10, 10/3)
+        mode (str): Fill method in erased area, can be:
+            - 'const' (default): All pixels are assign with the same value.
+            - 'rand': each pixel is assigned with a random value in [0, 255]
+        fill_color (sequence | Number): Base color filled in erased area.
+            Default: (128, 128, 128)
+        fill_std (sequence | Number, optional): If set and mode='rand', fill
+            erased area with random color from normal distribution
+            (mean=fill_color, std=fill_std); If not set, fill erased area with
+            random color from uniform distribution (0~255)
+            Default: None
+
+    Note:
+        See https://arxiv.org/pdf/1708.04896.pdf
+        This paper provided 4 modes: RE-R, RE-M, RE-0, RE-255, and use RE-M as
+        default.
+        - RE-R: RandomErasing(mode='rand')
+        - RE-M: RandomErasing(mode='const', fill_color=(123.67, 116.3, 103.5))
+        - RE-0: RandomErasing(mode='const', fill_color=0)
+        - RE-255: RandomErasing(mode='const', fill_color=255)
+    """
+
+    def __init__(self,
+                 erase_prob=0.5,
+                 min_area_ratio=0.02,
+                 max_area_ratio=0.4,
+                 aspect_range=(3 / 10, 10 / 3),
+                 mode='const',
+                 fill_color=(128, 128, 128),
+                 fill_std=None):
+        assert isinstance(erase_prob, float) and 0. <= erase_prob <= 1.
+        assert isinstance(min_area_ratio, float) and 0. <= min_area_ratio <= 1.
+        assert isinstance(max_area_ratio, float) and 0. <= max_area_ratio <= 1.
+        assert min_area_ratio <= max_area_ratio, \
+            'min_area_ratio should be smaller than max_area_ratio'
+        if isinstance(aspect_range, float):
+            aspect_range = min(aspect_range, 1 / aspect_range)
+            aspect_range = (aspect_range, 1 / aspect_range)
+        assert isinstance(aspect_range, Sequence) and len(aspect_range) == 2 \
+            and all(isinstance(x, float) for x in aspect_range), \
+            'aspect_range should be a float or Sequence with two float.'
+        assert all(x > 0 for x in aspect_range), \
+            'aspect_range should be positive.'
+        assert aspect_range[0] <= aspect_range[1], \
+            'In aspect_range (min, max), min should be smaller than max.'
+        assert mode in ['const', 'rand']
+        if isinstance(fill_color, Number):
+            fill_color = [fill_color] * 3
+        assert isinstance(fill_color, Sequence) and len(fill_color) == 3 \
+            and all(isinstance(x, Number) for x in fill_color), \
+            'fill_color should be a float or Sequence with three int.'
+        if fill_std is not None:
+            if isinstance(fill_std, Number):
+                fill_std = [fill_std] * 3
+            assert isinstance(fill_std, Sequence) and len(fill_std) == 3 \
+                and all(isinstance(x, Number) for x in fill_std), \
+                'fill_std should be a float or Sequence with three int.'
+
+        self.erase_prob = erase_prob
+        self.min_area_ratio = min_area_ratio
+        self.max_area_ratio = max_area_ratio
+        self.aspect_range = aspect_range
+        self.mode = mode
+        self.fill_color = fill_color
+        self.fill_std = fill_std
+
+    def _fill_pixels(self, img, top, left, h, w):
+        if self.mode == 'const':
+            patch = np.empty((h, w, 3), dtype=np.uint8)
+            patch[:, :] = np.array(self.fill_color, dtype=np.uint8)
+        elif self.fill_std is None:
+            # Uniform distribution
+            patch = np.random.uniform(0, 256, (h, w, 3)).astype(np.uint8)
+        else:
+            # Normal distribution
+            patch = np.random.normal(self.fill_color, self.fill_std, (h, w, 3))
+            patch = np.clip(patch.astype(np.int32), 0, 255).astype(np.uint8)
+
+        img[top:top + h, left:left + w] = patch
+        return img
+
+    def __call__(self, results):
+        """
+        Args:
+            results (dict): Results dict from pipeline
+
+        Returns:
+            dict: Results after the transformation.
+        """
+        for key in results.get('img_fields', ['img']):
+            if np.random.rand() > self.erase_prob:
+                continue
+            img = results[key]
+            img_h, img_w = img.shape[:2]
+
+            # convert to log aspect to ensure equal probability of aspect ratio
+            log_aspect_range = np.log(
+                np.array(self.aspect_range, dtype=np.float32))
+            aspect_ratio = np.exp(np.random.uniform(*log_aspect_range))
+            area = img_h * img_w
+            area *= np.random.uniform(self.min_area_ratio, self.max_area_ratio)
+
+            h = min(int(round(np.sqrt(area * aspect_ratio))), img_h)
+            w = min(int(round(np.sqrt(area / aspect_ratio))), img_w)
+            top = np.random.randint(0, img_h - h) if img_h > h else 0
+            left = np.random.randint(0, img_w - w) if img_w > w else 0
+            img = self._fill_pixels(img, top, left, h, w)
+
+            results[key] = img
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(erase_prob={self.erase_prob}, '
+        repr_str += f'min_area_ratio={self.min_area_ratio}, '
+        repr_str += f'max_area_ratio={self.max_area_ratio}, '
+        repr_str += f'aspect_range={self.aspect_range}, '
+        repr_str += f'mode={self.mode}, '
+        repr_str += f'fill_color={self.fill_color}, '
+        repr_str += f'fill_std={self.fill_std})'
+        return repr_str
 
 
 @PIPELINES.register_module()
@@ -423,22 +688,63 @@ class Resize(object):
 
 @PIPELINES.register_module()
 class CenterCrop(object):
-    """Center crop the image.
+    r"""Center crop the image.
 
     Args:
-        crop_size (int | tuple): Expected size after cropping, (h, w).
+        crop_size (int | tuple): Expected size after cropping with the format
+            of (h, w).
+        efficientnet_style (bool): Whether to use efficientnet style center
+            crop. Defaults to False.
+        crop_padding (int): The crop padding parameter in efficientnet style
+            center crop. Only valid if efficientnet style is True. Defaults to
+            32.
+        interpolation (str): Interpolation method, accepted values are
+            'nearest', 'bilinear', 'bicubic', 'area', 'lanczos'. Only valid if
+             efficientnet style is True. Defaults to 'bilinear'.
+        backend (str): The image resize backend type, accpeted values are
+            `cv2` and `pillow`. Only valid if efficientnet style is True.
+            Defaults to `cv2`.
+
 
     Notes:
-        If the image is smaller than the crop size, return the original image
+        If the image is smaller than the crop size, return the original image.
+        If efficientnet_style is set to False, the pipeline would be a simple
+        center crop using the crop_size.
+        If efficientnet_style is set to True, the pipeline will be to first to
+        perform the center crop with the crop_size_ as:
+
+        .. math::
+        crop\_size\_ = crop\_size / (crop\_size + crop\_padding) * short\_edge
+
+        And then the pipeline resizes the img to the input crop size.
     """
 
-    def __init__(self, crop_size):
-        assert isinstance(crop_size, int) or (isinstance(crop_size, tuple)
-                                              and len(crop_size) == 2)
+    def __init__(self,
+                 crop_size,
+                 efficientnet_style=False,
+                 crop_padding=32,
+                 interpolation='bilinear',
+                 backend='cv2'):
+        if efficientnet_style:
+            assert isinstance(crop_size, int)
+            assert crop_padding >= 0
+            assert interpolation in ('nearest', 'bilinear', 'bicubic', 'area',
+                                     'lanczos')
+            if backend not in ['cv2', 'pillow']:
+                raise ValueError(
+                    f'backend: {backend} is not supported for '
+                    'resize. Supported backends are "cv2", "pillow"')
+        else:
+            assert isinstance(crop_size, int) or (isinstance(crop_size, tuple)
+                                                  and len(crop_size) == 2)
         if isinstance(crop_size, int):
             crop_size = (crop_size, crop_size)
         assert crop_size[0] > 0 and crop_size[1] > 0
         self.crop_size = crop_size
+        self.efficientnet_style = efficientnet_style
+        self.crop_padding = crop_padding
+        self.interpolation = interpolation
+        self.backend = backend
 
     def __call__(self, results):
         crop_height, crop_width = self.crop_size[0], self.crop_size[1]
@@ -447,6 +753,14 @@ class CenterCrop(object):
             # img.shape has length 2 for grayscale, length 3 for color
             img_height, img_width = img.shape[:2]
 
+            # https://github.com/tensorflow/tpu/blob/master/models/official/efficientnet/preprocessing.py#L118 # noqa
+            if self.efficientnet_style:
+                img_short = min(img_height, img_width)
+                crop_height = crop_height / (crop_height +
+                                             self.crop_padding) * img_short
+                crop_width = crop_width / (crop_width +
+                                           self.crop_padding) * img_short
+
             y1 = max(0, int(round((img_height - crop_height) / 2.)))
             x1 = max(0, int(round((img_width - crop_width) / 2.)))
             y2 = min(img_height, y1 + crop_height) - 1
@@ -454,6 +768,13 @@ class CenterCrop(object):
 
             # crop the image
             img = mmcv.imcrop(img, bboxes=np.array([x1, y1, x2, y2]))
+
+            if self.efficientnet_style:
+                img = mmcv.imresize(
+                    img,
+                    tuple(self.crop_size[::-1]),
+                    interpolation=self.interpolation,
+                    backend=self.backend)
             img_shape = img.shape
             results[key] = img
         results['img_shape'] = img_shape
@@ -461,7 +782,12 @@ class CenterCrop(object):
         return results
 
     def __repr__(self):
-        return self.__class__.__name__ + f'(crop_size={self.crop_size})'
+        repr_str = self.__class__.__name__ + f'(crop_size={self.crop_size}'
+        repr_str += f', efficientnet_style={self.efficientnet_style}'
+        repr_str += f', crop_padding={self.crop_padding}'
+        repr_str += f', interpolation={self.interpolation}'
+        repr_str += f', backend={self.backend})'
+        return repr_str
 
 
 @PIPELINES.register_module()
@@ -492,6 +818,107 @@ class Normalize(object):
         repr_str = self.__class__.__name__
         repr_str += f'(mean={list(self.mean)}, '
         repr_str += f'std={list(self.std)}, '
+        repr_str += f'to_rgb={self.to_rgb})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class ColorJitter(object):
+    """Randomly change the brightness, contrast and saturation of an image.
+
+    Args:
+        brightness (float): How much to jitter brightness.
+            brightness_factor is chosen uniformly from
+            [max(0, 1 - brightness), 1 + brightness].
+        contrast (float): How much to jitter contrast.
+            contrast_factor is chosen uniformly from
+            [max(0, 1 - contrast), 1 + contrast].
+        saturation (float): How much to jitter saturation.
+            saturation_factor is chosen uniformly from
+            [max(0, 1 - saturation), 1 + saturation].
+    """
+
+    def __init__(self, brightness, contrast, saturation):
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+
+    def __call__(self, results):
+        brightness_factor = random.uniform(0, self.brightness)
+        contrast_factor = random.uniform(0, self.contrast)
+        saturation_factor = random.uniform(0, self.saturation)
+        color_jitter_transforms = [
+            dict(
+                type='Brightness',
+                magnitude=brightness_factor,
+                prob=1.,
+                random_negative_prob=0.5),
+            dict(
+                type='Contrast',
+                magnitude=contrast_factor,
+                prob=1.,
+                random_negative_prob=0.5),
+            dict(
+                type='ColorTransform',
+                magnitude=saturation_factor,
+                prob=1.,
+                random_negative_prob=0.5)
+        ]
+        random.shuffle(color_jitter_transforms)
+        transform = Compose(color_jitter_transforms)
+        return transform(results)
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(brightness={self.brightness}, '
+        repr_str += f'contrast={self.contrast}, '
+        repr_str += f'saturation={self.saturation})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class Lighting(object):
+    """Adjust images lighting using AlexNet-style PCA jitter.
+
+    Args:
+        eigval (list): the eigenvalue of the convariance matrix of pixel
+            values, respectively.
+        eigvec (list[list]): the eigenvector of the convariance matrix of pixel
+            values, respectively.
+        alphastd (float): The standard deviation for distribution of alpha.
+            Dafaults to 0.1
+        to_rgb (bool): Whether to convert img to rgb.
+    """
+
+    def __init__(self, eigval, eigvec, alphastd=0.1, to_rgb=True):
+        assert isinstance(eigval, list), \
+            f'eigval must be of type list, got {type(eigval)} instead.'
+        assert isinstance(eigvec, list), \
+            f'eigvec must be of type list, got {type(eigvec)} instead.'
+        for vec in eigvec:
+            assert isinstance(vec, list) and len(vec) == len(eigvec[0]), \
+                'eigvec must contains lists with equal length.'
+        self.eigval = np.array(eigval)
+        self.eigvec = np.array(eigvec)
+        self.alphastd = alphastd
+        self.to_rgb = to_rgb
+
+    def __call__(self, results):
+        for key in results.get('img_fields', ['img']):
+            img = results[key]
+            results[key] = mmcv.adjust_lighting(
+                img,
+                self.eigval,
+                self.eigvec,
+                alphastd=self.alphastd,
+                to_rgb=self.to_rgb)
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(eigval={self.eigval.tolist()}, '
+        repr_str += f'eigvec={self.eigvec.tolist()}, '
+        repr_str += f'alphastd={self.alphastd}, '
         repr_str += f'to_rgb={self.to_rgb})'
         return repr_str
 
@@ -535,8 +962,10 @@ class Albu(object):
     """
 
     def __init__(self, transforms, keymap=None, update_pad_shape=False):
-        if Compose is None:
+        if albumentations is None:
             raise RuntimeError('albumentations is not installed')
+        else:
+            from albumentations import Compose
 
         self.transforms = transforms
         self.filter_lost_elements = False
@@ -554,6 +983,7 @@ class Albu(object):
 
     def albu_builder(self, cfg):
         """Import a module from albumentations.
+
         It inherits some of :func:`build_from_cfg` logic.
         Args:
             cfg (dict): Config dict. It should at least contain the key "type".
@@ -585,7 +1015,9 @@ class Albu(object):
 
     @staticmethod
     def mapper(d, keymap):
-        """Dictionary mapper. Renames keys according to keymap provided.
+        """Dictionary mapper.
+
+        Renames keys according to keymap provided.
         Args:
             d (dict): old dict
             keymap (dict): {'old_key':'new_key'}
