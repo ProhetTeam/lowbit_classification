@@ -1,0 +1,3 @@
+[submodule "thirdparty/cls_quant_config"]
+	path = thirdparty/cls_quant_config
+	url = https://github.com/ProhetTeam/cls_quant_config.git
