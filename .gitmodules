@@ -1,3 +1,0 @@
-[submodule "thirdparty/config"]
-	path = thirdparty/config
-	url = https://github.com/flyingTan/cls_quant_config.git
