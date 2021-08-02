@@ -3,19 +3,21 @@ import copy
 import os, sys
 import os.path as osp
 import time
-
+sys.path.append('../')
+sys.path.append('../..')
 import mmcv
 import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist
 
+from lowbit_classification.lbitcls import __version__
 
 from lbitcls import __version__
 from lbitcls.datasets import build_dataset
 from lbitcls.utils import collect_env, get_root_logger
 from lbitcls.models import build_classifier
 from lbitcls.apis import set_random_seed, train_classifier
-from thirdparty.mtransformer import build_mtransformer
+from QuanTransformer.quantrans import build_mtransformer
 
 
 def parse_args():
