@@ -10,7 +10,7 @@ from mmcv.runner import get_dist_info
 import time
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
 import torch.nn as nn
-from lbitcls.models.distillers import BaseDistiller
+from lowbit_classification.lbitcls.models.distillers import BaseDistiller
 
 BN_MODULE_TYPES: Tuple[Type[nn.Module]] = (
     torch.nn.BatchNorm1d,

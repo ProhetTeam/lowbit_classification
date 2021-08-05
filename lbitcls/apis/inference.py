@@ -7,9 +7,9 @@ import torch
 from mmcv.parallel import collate, scatter
 from mmcv.runner import load_checkpoint
 
-from lbitcls.datasets.pipelines import Compose
-from lbitcls.models import build_classifier
-from thirdparty.mtransformer import build_mtransformer
+from lowbit_classification.lbitcls.datasets.pipelines import Compose
+from lowbit_classification.lbitcls.models import build_classifier
+from QuanTransformer.quantrans import build_mtransformer
 
 def init_model(config, checkpoint=None, device='cuda:0'):
     """Initialize a classifier from config file.

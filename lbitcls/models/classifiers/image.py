@@ -7,8 +7,8 @@ from ..utils.augment import Augments
 
 from ..builder import CLASSIFIERS, build_backbone, build_head, build_neck
 from .base import BaseClassifier
-from thirdparty.mtransformer.ABQAT import ABQATConv2d
-from thirdparty.mtransformer.LSQPlus import LSQDPlusConv2d
+from QuanTransformer.quantrans.quantops.ABQAT import ABQATConv2d
+from QuanTransformer.quantrans.quantops.LSQPlus import LSQDPlusConv2d
 
 @CLASSIFIERS.register_module()
 class ImageClassifier(BaseClassifier):

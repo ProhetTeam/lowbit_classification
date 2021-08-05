@@ -6,7 +6,7 @@ from mmcv.cnn import ConvModule, constant_init, kaiming_init
 from mmcv.runner import load_checkpoint
 from torch.nn.modules.batchnorm import _BatchNorm
 
-from lbitcls.models.utils import make_divisible
+from lowbit_classification.lbitcls.models.utils import make_divisible
 from ..builder import BACKBONES
 from .base_backbone import BaseBackbone
 

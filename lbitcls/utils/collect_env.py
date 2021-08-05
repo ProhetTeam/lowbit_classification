@@ -8,7 +8,7 @@ import mmcv
 import torch
 import torchvision
 
-import lbitcls
+import lowbit_classification.lbitcls as lbitcls
 import torch.distributed as dist
 
 def collect_env():

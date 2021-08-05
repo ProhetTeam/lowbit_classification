@@ -1,4 +1,4 @@
-from lbitcls.models import losses
+from lowbit_classification.lbitcls.models import losses
 from logging import setLoggerClass
 from numpy import mod
 from torch._C import set_flush_denormal
@@ -7,12 +7,12 @@ import torch
 from torch.nn.modules import loss
 from ..builder import CLASSIFIERS, DISTILLERS, build_classifier, build_backbone, build_head, build_neck, build_loss
 from ..classifiers.base import BaseClassifier
-from thirdparty.mtransformer.ABQAT import ABQATConv2d
-from thirdparty.mtransformer.LSQPlus import LSQDPlusConv2d
+from QuanTransformer.quantrans.quantops.ABQAT import ABQATConv2d
+from QuanTransformer.quantrans.quantops.LSQPlus import LSQDPlusConv2d
 
 from .base import BaseDistiller
 from mmcv import Config
-from thirdparty.mtransformer import build_mtransformer
+from QuanTransformer.quantrans import build_mtransformer
 from mmcv.runner import load_checkpoint
 
 @DISTILLERS.register_module()

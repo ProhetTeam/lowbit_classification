@@ -1,4 +1,4 @@
-from lbitcls.core.lossupdater import loss_weight_decay
+from lowbit_classification.lbitcls.core.lossupdater import loss_weight_decay
 import random
 from re import T
 
@@ -8,10 +8,10 @@ from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner, OptimizerHook,
                          build_optimizer, build_runner)
 
-from lbitcls.core import DistEvalHook, EvalHook, Fp16OptimizerHook
-from lbitcls.datasets import build_dataloader, build_dataset
-from lbitcls.utils import get_root_logger
-from lbitcls.core import PrecisebnHook, DistPrecisebnHook
+from lowbit_classification.lbitcls.core import DistEvalHook, EvalHook, Fp16OptimizerHook
+from lowbit_classification.lbitcls.datasets import build_dataloader, build_dataset
+from lowbit_classification.lbitcls.utils import get_root_logger
+from lowbit_classification.lbitcls.core import PrecisebnHook, DistPrecisebnHook
 
 def set_random_seed(seed, deterministic=False):
     """Set random seed.

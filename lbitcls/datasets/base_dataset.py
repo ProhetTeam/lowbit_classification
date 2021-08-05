@@ -1,11 +1,10 @@
 import copy
 from abc import ABCMeta, abstractmethod
-
 import numpy as np
 from torch.utils.data import Dataset
 
-from lbitcls.core.evaluation import precision_recall_f1, support, roc
-from lbitcls.models.losses import accuracy
+from lowbit_classification.lbitcls.core.evaluation import precision_recall_f1, support, roc
+from lowbit_classification.lbitcls.models.losses import accuracy
 from .pipelines import Compose
 
 

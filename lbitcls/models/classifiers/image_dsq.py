@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from ..builder import CLASSIFIERS, build_backbone, build_head, build_neck
 from .base import BaseClassifier
-from thirdparty.mtransformer.DSQ import DSQConv, DSQConvV2
+from QuanTransformer.quantrans.quantops.DSQ import DSQConv, DSQConvV2
 
 
 @CLASSIFIERS.register_module()
