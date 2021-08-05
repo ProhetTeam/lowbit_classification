@@ -1,17 +1,14 @@
 import argparse
 import copy
 import os, sys
+sys.path.append('..')
+sys.path.append('../..')
 import os.path as osp
 import time
-sys.path.append('../')
-sys.path.append('../..')
 import mmcv
 import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist
-
-from lowbit_classification.lbitcls import __version__
-
 from lbitcls import __version__
 from lbitcls.datasets import build_dataset
 from lbitcls.utils import collect_env, get_root_logger
@@ -19,9 +16,8 @@ from lbitcls.models import build_classifier
 from lbitcls.apis import set_random_seed, train_classifier
 from QuanTransformer.quantrans import build_mtransformer
 
-
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train a quantization classifier')
+    parser = argparse.ArgumentParser(description='Train a quantization clalssifier')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
     parser.add_argument(
