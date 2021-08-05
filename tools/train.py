@@ -10,7 +10,7 @@ import torch
 from mmcv import Config, DictAction
 from mmcv.runner import init_dist
 
-from lowbit_classification.lbitcls import __version__
+from lbitcls import __version__
 
 from lbitcls import __version__
 from lbitcls.datasets import build_dataset
