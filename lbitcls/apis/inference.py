@@ -41,7 +41,7 @@ def init_model(config, checkpoint=None, device='cuda:0'):
         if 'CLASSES' in checkpoint['meta']:
             model.CLASSES = checkpoint['meta']['CLASSES']
         else:
-            from lbitcls.datasets import ImageNet
+            from lowbit_classification.lbitcls.datasets import ImageNet
             warnings.simplefilter('once')
             warnings.warn('Class names are not saved in the checkpoint\'s '
                           'meta data, use imagenet by default.')
