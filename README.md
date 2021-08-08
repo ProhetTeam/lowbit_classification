@@ -22,12 +22,12 @@ Please refer to [install.md](doc/install.md).
 - [x] Res2Net
 
 ### Quantization
+- [x] [APOT]()
+- [x] [DoReFa]()
 - [x] [DSQ]()
 - [x] [LSQ]()
 - [x] [LSQ+]()
-
-## Installation
-Please refer to [install.md](docs/install.md) for installation and dataset preparation.
+- [x] [UQ]()
 
 
 ## Contact

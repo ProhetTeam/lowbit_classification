@@ -1,6 +1,8 @@
 import argparse
-import os
+import os, sys
 import warnings
+sys.path.append('../')
+sys.path.append('../..')
 
 import mmcv
 import numpy as np
@@ -9,11 +11,11 @@ from mmcv import DictAction
 from mmcv.parallel import MMDataParallel, MMDistributedDataParallel
 from mmcv.runner import get_dist_info, init_dist, load_checkpoint
 
-from lbitcls.apis import multi_gpu_test, single_gpu_test
-from lbitcls.core import wrap_fp16_model
-from lbitcls.datasets import build_dataloader, build_dataset
-from lbitcls.models import build_classifier
-from thirdparty.mtransformer import build_mtransformer
+from lowbit_classification.lbitcls.apis import multi_gpu_test, single_gpu_test
+from lowbit_classification.lbitcls.core import wrap_fp16_model
+from lowbit_classification.lbitcls.datasets import build_dataloader, build_dataset
+from lowbit_classification.lbitcls.models import build_classifier
+from QuanTransformer.quantrans import build_mtransformer
 
 def parse_args():
     parser = argparse.ArgumentParser(description='lbitcls test model')
@@ -98,6 +100,7 @@ def main():
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
+    
     checkpoint = load_checkpoint(model, args.checkpoint, map_location='cpu')
 
     if not distributed:
@@ -125,7 +128,7 @@ def main():
             if 'CLASSES' in checkpoint['meta']:
                 CLASSES = checkpoint['meta']['CLASSES']
             else:
-                from lbitcls.datasets import ImageNet
+                from lowbit_classification.lbitcls.datasets import ImageNet
                 warnings.simplefilter('once')
                 warnings.warn('Class names are not saved in the checkpoint\'s '
                               'meta data, use imagenet by default.')
